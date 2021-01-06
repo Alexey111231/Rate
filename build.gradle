@@ -1,0 +1,19 @@
+plugins {
+    id 'org.springframework.boot' version '2.3.0.RELEASE'
+    id 'io.spring.dependency-management' version '1.0.9.RELEASE'
+    id 'io.freefair.lombok' version '5.0.0'
+    id 'java'
+}
+
+group = 'com.example'
+version = '1.0-SNAPSHOT'
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.cloud:spring-cloud-starter-openfeign:2.0.2.RELEASE'
+    implementation 'com.googlecode.json-simple:json-simple:1.1.1'
+}
+
