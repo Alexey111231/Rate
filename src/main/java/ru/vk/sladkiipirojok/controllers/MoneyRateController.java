@@ -1,44 +1,88 @@
 package ru.vk.sladkiipirojok.controllers;
 
-import lombok.AllArgsConstructor;
-import org.json.simple.JSONArray;
-import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.ModelAndView;
+import org.springframework.web.servlet.view.json.MappingJackson2JsonView;
+import ru.vk.sladkiipirojok.Config;
 import ru.vk.sladkiipirojok.ParserUtil;
-import ru.vk.sladkiipirojok.service.FeignGifClient;
-import ru.vk.sladkiipirojok.service.FeignMoneyClient;
-import ru.vk.sladkiipirojok.service.PropertiesService;
-
-import java.util.Properties;
+import ru.vk.sladkiipirojok.feignclients.FeignGifClient;
+import ru.vk.sladkiipirojok.feignclients.FeignMoneyClient;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 
 @RequestMapping("/")
 @RestController
-@AllArgsConstructor
 public final class MoneyRateController {
-    @Autowired
     public final FeignGifClient gifClient;
-    @Autowired
     public final  FeignMoneyClient moneyClient;
+    public final Config configuration;
+
     @Autowired
-    public final PropertiesService configuration;
+    public MoneyRateController(FeignGifClient gifClient, FeignMoneyClient moneyClient, Config configuration) {
+        this.gifClient = gifClient;
+        this.moneyClient = moneyClient;
+        this.configuration = configuration;
+    }
+
     @GetMapping("rand-gif")
     String getGif(@RequestParam String currency_id) throws ParseException {
+        ResponseEntity<String> response = gifClient.getRandGif(configuration.getApiGifKey(),
+                isRich(currency_id)? configuration.getApiGifRich():configuration.getApiGifBroke(),
+                (int) Math.floor(Math.random()*100), 1);
+        if(!response.getStatusCode().equals(HttpStatus.OK))
+            throw new IllegalStateException("The remote server error");
+
             return "<img src=\"" +
-                    ParserUtil.getGifURL(gifClient.getRandGif(configuration.getGifApiKey(),
-                    isRich(currency_id)? configuration.getRichGif():configuration.getBrokeGif(),
-                    (int) Math.floor(Math.random()*100), 1)) + "\"/>";
+                    ParserUtil.getGifURL(response.getBody()) + "\"/>";
     }
 
     boolean isRich(String currency_id) throws ParseException {
-        return ParserUtil.getRate(moneyClient.getLatest(configuration.getRateApiKey(),configuration.getBaseCurrency()), currency_id) >
-                ParserUtil.getRate(moneyClient.getByDate(configuration.getRateApiKey(),
-                        "2014-12-23", configuration.getBaseCurrency()),
-                        currency_id);
+        ResponseEntity<String> responseCurent = moneyClient
+                .getLatest(configuration.getApiRateKey(),configuration.getBaseCurrency());
+
+        ResponseEntity<String> responseYesterday = moneyClient
+                .getByDate(configuration.getApiRateKey(),
+                LocalDate.now(ZoneOffset.UTC).minusDays(1).toString(), configuration.getBaseCurrency());
+
+        ResponseEntity<String> responseAllCurrency = moneyClient.getAllCurrencies();
+
+        if(!responseCurent.getStatusCode().equals(HttpStatus.OK)
+                || !responseYesterday.getStatusCode().equals(HttpStatus.OK)
+                || !responseAllCurrency.getStatusCode().equals(HttpStatus.OK))
+            throw new IllegalStateException("The remote server error");
+
+        if(!currency_id.matches("[A-Z]{3}") || !responseAllCurrency.getBody().contains(currency_id))
+            throw new IllegalArgumentException("Error currency id");
+
+        Double curentCurrency =  ParserUtil.getRate(responseCurent.getBody(), currency_id);
+        Double yesterdayCurrency =  ParserUtil.getRate(responseYesterday.getBody(), currency_id);
+        return  curentCurrency > yesterdayCurrency;
+    }
+
+    @ExceptionHandler(ParseException.class)
+    public ModelAndView parseException(ParseException exception) {
+        return createErrorJSON(exception, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ModelAndView currencyError(IllegalArgumentException exception){
+        return createErrorJSON(exception, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ModelAndView remoteException(IllegalStateException exception) {
+        return createErrorJSON(exception, HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
+    private ModelAndView createErrorJSON(Exception exception, HttpStatus status){
+        ModelAndView errorView = new ModelAndView(new MappingJackson2JsonView());
+        errorView.setStatus(status);
+        errorView.addObject("httpstatus", status);
+        errorView.addObject("error", exception.getMessage());
+        return errorView;
     }
 }

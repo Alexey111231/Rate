@@ -15,5 +15,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.cloud:spring-cloud-starter-openfeign:2.0.2.RELEASE'
     implementation 'com.googlecode.json-simple:json-simple:1.1.1'
+    testCompile    'org.mockito:mockito-core:3.7.0'
+    testCompile    'org.springframework.boot:spring-boot-starter-test:2.4.1'
+
 }
 
