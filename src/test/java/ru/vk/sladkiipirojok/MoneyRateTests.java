@@ -41,7 +41,6 @@ public class MoneyRateTests {
 
         Mockito.when(moneyClient.getAllCurrencies()).thenReturn(new ResponseEntity<>(ServiceTestData.MONEY_API_ALL_CURRENCY_BODY,
                 HttpStatus.OK));
-
     }
     @SneakyThrows
     @Test
@@ -73,10 +72,8 @@ public class MoneyRateTests {
 
         GifService gifService = new GifService(gifClient, moneyClient, configuration);
 
-        IllegalStateException ise = Assert.assertThrows(IllegalStateException.class,
+        Assert.assertThrows(IllegalStateException.class,
                 () -> gifService.getGif("ZMW"));
-
-        Assert.assertFalse(ise.getMessage().isEmpty());
     }
 
     @SneakyThrows
@@ -87,9 +84,7 @@ public class MoneyRateTests {
 
         GifService gifService = new GifService(gifClient, moneyClient, configuration);
 
-        IllegalArgumentException iae = Assert.assertThrows(IllegalArgumentException.class,
+        Assert.assertThrows(IllegalArgumentException.class,
                 ()->gifService.getGif("ZMWD"));
-
-        Assert.assertFalse(iae.getMessage().isEmpty());
     }
 }
